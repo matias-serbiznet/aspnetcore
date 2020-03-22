@@ -743,6 +743,15 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                     }
                 }
 
+                // Maximum HPack encoder size is limited by Http2Limits.HeaderTableSize, configured max the server.
+                //
+                // Note that the client HPack decoder doesn't care about the ACK so we don't need to lock sending the
+                // ACK and updating the table size on the server together.
+                // The client will wait until a size agreed upon by it (sent in SETTINGS_HEADER_TABLE_SIZE) and the
+                // server (sent as a dynamic table size update in the next HEADERS frame) is received before applying
+                // the new size.
+                _frameWriter.UpdateMaxHeaderTableSize(Math.Min(_clientSettings.HeaderTableSize, (uint)Limits.Http2.HeaderTableSize));
+
                 return ackTask.AsTask();
             }
             catch (Http2SettingsParameterOutOfRangeException ex)
