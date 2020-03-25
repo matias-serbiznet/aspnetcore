@@ -14,7 +14,7 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Build
         public async Task Build_WithDefaultSettings_Works()
         {
             // Arrange
-            using var project = ProjectDirectory.Create("standalone");
+            using var project = ProjectDirectory.Create("standalone", additionalProjects: new[] { "razorclasslibrary" });
             var result = await MSBuildProcessManager.DotnetMSBuild(project);
 
             Assert.BuildPassed(result);
@@ -57,7 +57,7 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Build
         public async Task Build_WithLinkOnBuildDisabled_Works()
         {
             // Arrange
-            using var project = ProjectDirectory.Create("standalone");
+            using var project = ProjectDirectory.Create("standalone", additionalProjects: new[] { "razorclasslibrary" });
             project.AddProjectFileContent(
 @"<PropertyGroup>
     <BlazorWebAssemblyEnableLinking>false</BlazorWebAssemblyEnableLinking>
