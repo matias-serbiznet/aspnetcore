@@ -227,7 +227,6 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Build
             Assert.FileExists(result, blazorPublishDirectory, "_framework", "_bin", "RazorClassLibrary.dll");
             Assert.FileExists(result, blazorPublishDirectory, "_framework", "_bin", "Microsoft.Extensions.Logging.Abstractions.dll"); // Verify dependencies are part of the output.
 
-
             // Verify static assets are in the publish directory
             Assert.FileExists(result, blazorPublishDirectory, "index.html");
 
