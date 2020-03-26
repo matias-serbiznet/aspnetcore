@@ -127,7 +127,9 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
 
             ClickAndNavigate(By.PartialLinkText("Settings"), "/admin-settings");
 
-            Browser.Exists(By.Id("admin-action")).Click();
+            var admin = Browser.Exists(By.Id("admin-action"));
+
+            Browser.Execute(By.Id("admin-success"), button => button.Click());
 
             Browser.Exists(By.Id("admin-success"));
         }

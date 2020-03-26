@@ -66,6 +66,58 @@ namespace Microsoft.AspNetCore.E2ETesting
                 return result;
             }, timeout);
 
+        public static void Execute(this IWebDriver driver, By finder, Action<IWebElement> assertion, TimeSpan timeout = default)
+        {
+            if (timeout == default)
+            {
+                timeout = !TestRunFailed ? DefaultTimeout : FailureTimeout;
+            }
+
+            Exception lastException = null;
+            try
+            {
+                new WebDriverWait(driver, timeout).Until(_ =>
+                {
+                    try
+                    {
+                        ExecuteCore(driver, finder, assertion);
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        lastException = e;
+                        return false;
+                    }
+                });
+            }
+            catch (WebDriverTimeoutException)
+            {
+                // At this point at least one test failed, so we mark the test as failed. Any assertions after this one
+                // will fail faster. There's a small race condition here between checking the value for TestRunFailed
+                // above and setting it here, but nothing bad can come out of it. Worst case scenario, one or more
+                // tests running concurrently might use the DefaultTimeout in their current assertion, which is fine.
+                TestRunFailed = true;
+
+                var innerHtml = driver.FindElement(By.CssSelector(":first-child")).GetAttribute("innerHTML");
+
+                var fileId = $"{Guid.NewGuid():N}.png";
+                var screenShotPath = Path.Combine(Path.GetFullPath(E2ETestOptions.Instance.ScreenShotsPath), fileId);
+                var errors = driver.GetBrowserLogs(LogLevel.All);
+
+                TakeScreenShot(driver, screenShotPath);
+                var exceptionInfo = lastException != null ? ExceptionDispatchInfo.Capture(lastException) :
+                    CaptureException(() => ExecuteCore(driver, finder, assertion));
+
+                throw new BrowserAssertFailedException(errors, exceptionInfo.SourceException, screenShotPath, innerHtml);
+            }
+
+            static void ExecuteCore(IWebDriver driver, By finder, Action<IWebElement> assertion)
+            {
+                var result = driver.Exists(finder);
+                assertion(result);
+            }
+        }
+
         private static void WaitAssertCore(IWebDriver driver, Action assertion, TimeSpan timeout = default)
         {
             WaitAssertCore<object>(driver, () => { assertion(); return null; }, timeout);
