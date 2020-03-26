@@ -89,6 +89,50 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
             ValidateFetchData();
         }
 
+        [Fact]
+        public void CanPreserveApplicationState_DuringLogIn()
+        {
+            var originalAppState = Browser.Exists(By.Id("app-state")).Text;
+
+            var link = By.PartialLinkText("Fetch data");
+            var page = "/Identity/Account/Login";
+
+            ClickAndNavigate(link, page);
+
+            var userName = $"{Guid.NewGuid()}@example.com";
+            var password = $"!Test.Password1$";
+
+            FirstTimeRegister(userName, password);
+
+            ValidateFetchData();
+
+            var homeLink = By.PartialLinkText("Home");
+            var homePage = "/";
+            ClickAndNavigate(homeLink, homePage);
+
+            var restoredAppState = Browser.Exists(By.Id("app-state")).Text;
+            Assert.Equal(originalAppState, restoredAppState);
+        }
+
+        [Fact]
+        public void CanShareUserRolesBetweenClientAndServer()
+        {
+            ClickAndNavigate(By.PartialLinkText("Log in"), "/Identity/Account/Login");
+
+            var userName = $"{Guid.NewGuid()}@example.com";
+            var password = $"!Test.Password1$";
+            FirstTimeRegister(userName, password);
+
+            ClickAndNavigate(By.PartialLinkText("Make admin"), "/new-admin");
+
+            ClickAndNavigate(By.PartialLinkText("Settings"), "/admin-settings");
+
+            Browser.Exists(By.Id("admin-action")).Click();
+
+            Browser.Exists(By.Id("admin-success"));
+        }
+
+
         private void ClickAndNavigate(By link, string page)
         {
             Browser.FindElement(link).Click();
@@ -133,13 +177,14 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
                 .OrderBy(o => o.Item1)
                 .ToArray();
 
-            Assert.Equal(4, claims.Length);
+            Assert.Equal(5, claims.Length);
 
             Assert.Equal(new[]
             {
                 ("amr", "pwd"),
                 ("idp", "local"),
                 ("name", userName),
+                ("NewUser", "true"),
                 ("preferred_username", userName)
             },
             claims);
@@ -322,6 +367,14 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
         {
             Browser.FindElement(By.PartialLinkText("Register as a new user")).Click();
             RegisterCore(userName, password);
+            CompleteProfileDetails();
+        }
+
+        private void CompleteProfileDetails()
+        {
+            Browser.Contains("/preferences", () => Browser.Url);
+            Browser.FindElement(By.Id("color-preference")).SendKeys("Red");
+            Browser.FindElement(By.Id("submit-preference")).Click();
         }
 
         private void RegisterCore(string userName, string password)
