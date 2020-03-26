@@ -221,8 +221,7 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
             var password = $"!Test.Password1$";
             RegisterCore(userName, password);
 
-            Browser.Exists(By.PartialLinkText($"Hello, {userName}!")).Click();
-            Browser.Contains("/Identity/Account/Manage", () => Browser.Url);
+            ClickAndNavigate(By.PartialLinkText($"Hello, {userName}!"), "/Identity/Account/Manage");
 
             Browser.Navigate().Back();
             Browser.Equal("/", () => new Uri(Browser.Url).PathAndQuery);
