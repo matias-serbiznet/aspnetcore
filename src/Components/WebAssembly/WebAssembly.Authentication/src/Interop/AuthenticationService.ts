@@ -63,12 +63,32 @@ export interface AuthorizeService {
 
 class OidcAuthorizeService implements AuthorizeService {
     private _userManager: UserManager;
-
+    private _intialSilentSignIn: Promise<void> | undefined;
     constructor(userManager: UserManager) {
         this._userManager = userManager;
     }
 
+    async trySilentSignIn() {
+        if (!this._intialSilentSignIn) {
+            this._intialSilentSignIn = (async () => {
+                try {
+                    await this._userManager.signinSilent();
+                    return;
+                } catch (e) {
+                }
+            })();
+        }
+
+        return this._intialSilentSignIn;
+    }
+
     async getUser() {
+        if (window.parent == window && !window.opener && !window.frameElement &&
+            !location.href.startsWith(this._userManager.settings.redirect_uri!)) {
+            // If we are not inside a hidden iframe, try authenticating silently.
+            await AuthenticationService.instance.trySilentSignIn();
+        }
+
         const user = await this._userManager.getUser();
         return user && user.profile;
     }
@@ -253,21 +273,30 @@ class OidcAuthorizeService implements AuthorizeService {
 export class AuthenticationService {
 
     static _infrastructureKey = 'Microsoft.AspNetCore.Components.WebAssembly.Authentication';
-    static _initialized : Promise<void>;
+    static _initialized: Promise<void>;
     static instance: OidcAuthorizeService;
+    static _pendingOperations: { [key: string]: Promise<AuthenticationResult> | undefined } = {}
 
     public static async init(settings: UserManagerSettings & AuthorizeServiceSettings) {
         // Multiple initializations can start concurrently and we want to avoid that.
         // In order to do so, we create an initialization promise and the first call to init
         // tries to initialize the app and sets up a promise other calls can await on.
         if (!AuthenticationService._initialized) {
-            this._initialized = (async () => {
-                const userManager = await this.createUserManager(settings);
+            AuthenticationService._initialized = (async () => {
+                const userManager = await AuthenticationService.createUserManager(settings);
                 AuthenticationService.instance = new OidcAuthorizeService(userManager);
+
+                if (window.parent != window && !window.opener && (window.frameElement &&
+                    location.href.startsWith(userManager.settings.redirect_uri!))) {
+                    // If we are inside a hidden iframe, try completing the sign in early.
+                    AuthenticationService.instance.completeSignIn(location.href);
+                }
             })();
+
+            await AuthenticationService._initialized;
         }
 
-        await this._initialized;
+        return AuthenticationService._initialized;
     }
 
     public static getUser() {
@@ -282,45 +311,61 @@ export class AuthenticationService {
         return AuthenticationService.instance.signIn(state);
     }
 
-    public static completeSignIn(url: string) {
-        return AuthenticationService.instance.completeSignIn(url);
+    public static async completeSignIn(url: string) {
+        let operation = this._pendingOperations[url];
+        if (!operation) {
+            operation = AuthenticationService.instance.completeSignIn(url);
+            await operation;
+            this._pendingOperations[url] = undefined;
+        }
+
+        return operation;
     }
 
     public static signOut(state: any) {
         return AuthenticationService.instance.signOut(state);
     }
 
-    public static completeSignOut(url: string) {
-        return AuthenticationService.instance.completeSignOut(url);
+    public static async completeSignOut(url: string) {
+        let operation = this._pendingOperations[url];
+        if (!operation) {
+            operation = AuthenticationService.instance.completeSignOut(url);
+            await operation;
+            this._pendingOperations[url] = undefined;
+        }
+
+        return operation;
     }
 
     private static async createUserManager(settings: OidcAuthorizeServiceSettings): Promise<UserManager> {
         let finalSettings: UserManagerSettings;
-        if (isApiAuthorizationSettings(settings)) {
-            let response = await fetch(settings.configurationEndpoint);
-            if (!response.ok) {
-                throw new Error(`Could not load settings from '${settings.configurationEndpoint}'`);
-            }
-
-            const downloadedSettings = await response.json();
-
-            window.sessionStorage.setItem(`${AuthenticationService._infrastructureKey}.CachedAuthSettings`, JSON.stringify(settings));
-
-            downloadedSettings.automaticSilentRenew = true;
-            downloadedSettings.includeIdTokenInSilentRenew = true;
-
-            finalSettings = downloadedSettings;
+        const cachedSettings = window.sessionStorage.getItem(`${AuthenticationService._infrastructureKey}.CachedAuthSettings`);
+        if (cachedSettings) {
+            finalSettings = JSON.parse(cachedSettings);
         } else {
-            if (!settings.scope) {
-                settings.scope = settings.defaultScopes.join(' ');
+            if (isApiAuthorizationSettings(settings)) {
+                let response = await fetch(settings.configurationEndpoint);
+                if (!response.ok) {
+                    throw new Error(`Could not load settings from '${settings.configurationEndpoint}'`);
+                }
+
+                const downloadedSettings = await response.json();
+
+                finalSettings = downloadedSettings;
+            } else {
+                if (!settings.scope) {
+                    settings.scope = settings.defaultScopes.join(' ');
+                }
+
+                if (settings.response_type === null) {
+                    // If the response type is not set, it gets serialized as null. OIDC-client behaves differently than when the value is undefined, so we explicitly check for a null value and remove the property instead.
+                    delete settings.response_type;
+                }
+
+                finalSettings = settings;
             }
 
-            if (settings.response_type === null) {
-                // If the response type is not set, it gets serialized as null. OIDC-client behaves differently than when the value is undefined, so we explicitly check for a null value and remove the property instead.
-                delete settings.response_type;
-            }
-
-            finalSettings = settings;
+            window.sessionStorage.setItem(`${AuthenticationService._infrastructureKey}.CachedAuthSettings`, JSON.stringify(finalSettings));
         }
 
         const userManager = new UserManager(finalSettings);
