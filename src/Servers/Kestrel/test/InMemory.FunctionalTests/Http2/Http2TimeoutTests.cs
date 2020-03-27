@@ -101,7 +101,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             _mockTimeoutControl.Verify(c => c.SetTimeout(It.IsAny<long>(), TimeoutReason.RequestHeaders), Times.Once);
 
             await ExpectAsync(Http2FrameType.HEADERS,
-                withLength: 35,
+                withLength: 36,
                 withFlags: (byte)(Http2HeadersFrameFlags.END_HEADERS | Http2HeadersFrameFlags.END_STREAM),
                 withStreamId: 1);
 
@@ -901,7 +901,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             backpressureTcs.SetResult(null);
 
             await ExpectAsync(Http2FrameType.HEADERS,
-                withLength: 5,
+                withLength: 6,
                 withFlags: (byte)(Http2HeadersFrameFlags.END_HEADERS | Http2HeadersFrameFlags.END_STREAM),
                 withStreamId: 1);
 

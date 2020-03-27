@@ -158,19 +158,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             Assert.Equal(
                 "88-C1-61-1D-4D-6F-6E-2C-20-32-31-20-4F-63-74-20-" +
                 "32-30-31-33-20-32-30-3A-31-33-3A-32-32-20-47-4D-" +
-                "54-5A-04-67-7A-69-70-C1-77-38-66-6F-6F-3D-41-53-" +
-                "44-4A-4B-48-51-4B-42-5A-58-4F-51-57-45-4F-50-49-" +
-                "55-41-58-51-57-45-4F-49-55-3B-20-6D-61-78-2D-61-" +
-                "67-65-3D-33-36-30-30-3B-20-76-65-72-73-69-6F-6E-" +
-                "3D-31", hex);
+                "54-5A-04-67-7A-69-70-C1-2F-28-38-66-6F-6F-3D-41-" +
+                "53-44-4A-4B-48-51-4B-42-5A-58-4F-51-57-45-4F-50-" +
+                "49-55-41-58-51-57-45-4F-49-55-3B-20-6D-61-78-2D-" +
+                "61-67-65-3D-33-36-30-30-3B-20-76-65-72-73-69-6F-" +
+                "6E-3D-31", hex);
 
             entries = GetHeaderEntries(http2HPackEncoder);
             Assert.Collection(entries,
-                e =>
-                {
-                    Assert.Equal("Set-Cookie", e.Name);
-                    Assert.Equal("foo=ASDJKHQKBZXOQWEOPIUAXQWEOIU; max-age=3600; version=1", e.Value);
-                },
                 e =>
                 {
                     Assert.Equal("Content-Encoding", e.Name);
@@ -180,26 +175,44 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
                 {
                     Assert.Equal("Date", e.Name);
                     Assert.Equal("Mon, 21 Oct 2013 20:13:22 GMT", e.Value);
+                },
+                e =>
+                {
+                    Assert.Equal(":status", e.Name);
+                    Assert.Equal("307", e.Value);
+                },
+                e =>
+                {
+                    Assert.Equal("Location", e.Name);
+                    Assert.Equal("https://www.example.com", e.Value);
                 });
         }
 
-        [Fact]
-        public void BeginEncodeHeaders_SensitiveValue_NeverIndexAndNoHeaderEntry()
+        [Theory]
+        [InlineData("Set-Cookie", true)]
+        [InlineData("Content-Disposition", true)]
+        [InlineData("Content-Length", false)]
+        public void BeginEncodeHeaders_ExcludedHeaders_NotAddedToTable(string headerName, bool neverIndex)
         {
             Span<byte> buffer = new byte[1024 * 16];
 
             var headers = new HttpResponseHeaders();
-            headers.Append("x-Custom", "Value!");
+            headers.Append(headerName, "1");
 
             var enumerator = new Http2HeadersEnumerator();
             enumerator.Initialize(headers);
 
-            var http2HPackEncoder = new Http2HPackEncoder(Http2PeerSettings.DefaultHeaderTableSize, new TestSensitivityDetector());
-            Assert.True(http2HPackEncoder.BeginEncodeHeaders(200, enumerator, buffer, out var length));
+            var http2HPackEncoder = new Http2HPackEncoder(Http2PeerSettings.DefaultHeaderTableSize);
+            Assert.True(http2HPackEncoder.BeginEncodeHeaders(enumerator, buffer, out _));
 
-            var result = buffer.Slice(0, length).ToArray();
-            var hex = BitConverter.ToString(result);
-            Assert.Equal("88-10-08-78-2D-63-75-73-74-6F-6D-06-56-61-6C-75-65-21", hex);
+            if (neverIndex)
+            {
+                Assert.Equal(0x20, buffer[0] & 0x20);
+            }
+            else
+            {
+                Assert.Equal(0, buffer[0] & 0x40);
+            }
 
             Assert.Empty(GetHeaderEntries(http2HPackEncoder));
         }

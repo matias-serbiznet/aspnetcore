@@ -14,7 +14,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
         // Internal for testing
         internal readonly HPackHeaderEntry Head;
 
-        private readonly IHeaderSensitivityDetector _sensitivityDetector;
         private readonly HPackHeaderEntry[] _headerBuckets;
         private readonly byte _hashMask;
         private uint _headerTableSize;
@@ -22,7 +21,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
         private bool _pendingTableSizeUpdate;
         private HPackHeaderEntry _removed;
 
-        public Http2HPackEncoder(uint maxHeaderTableSize = Http2PeerSettings.DefaultHeaderTableSize, IHeaderSensitivityDetector sensitivityDetector = null)
+        public Http2HPackEncoder(uint maxHeaderTableSize = Http2PeerSettings.DefaultHeaderTableSize)
         {
             _maxHeaderTableSize = maxHeaderTableSize;
             Head = new HPackHeaderEntry();
@@ -32,7 +31,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
             _headerBuckets = new HPackHeaderEntry[16];
             _hashMask = (byte)(_headerBuckets.Length - 1);
             Head.Before = Head.After = Head;
-            _sensitivityDetector = sensitivityDetector;
         }
 
         public void UpdateMaxHeaderTableSize(uint maxHeaderTableSize)
@@ -171,7 +169,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
         private bool EncodeHeader(Span<byte> buffer, int staticTableIndex, string name, string value, out int bytesWritten)
         {
             // Never index sensitive value.
-            if (_sensitivityDetector?.IsSensitive(name, value) ?? false)
+            if (IsSensitive(staticTableIndex, name))
             {
                 var index = ResolveDynamicTableIndex(staticTableIndex, name);
 
@@ -181,7 +179,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
             }
 
             // No dynamic table. Only use the static table.
-            if (_maxHeaderTableSize == 0)
+            if (_maxHeaderTableSize == 0 || IsNotDynamicallyIndexed(staticTableIndex))
             {
                 return staticTableIndex == -1
                     ? HPackEncoder.EncodeLiteralHeaderFieldWithoutIndexingNewName(name, value, buffer, out bytesWritten)
@@ -200,6 +198,28 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
             }
 
             return EncodeDynamicHeader(buffer, staticTableIndex, name, value, out bytesWritten);
+        }
+
+        private bool IsSensitive(int staticTableIndex, string name)
+        {
+            // Set-Cookie could contain sensitive data.
+            if (staticTableIndex == H2StaticTable.SetCookie)
+            {
+                return true;
+            }
+            if (string.Equals(name, "Content-Disposition", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsNotDynamicallyIndexed(int staticTableIndex)
+        {
+            // Content-Length is added to static content. Content length is different for each
+            // file, and is unlikely to be reused because of browser caching.
+            return staticTableIndex == H2StaticTable.ContentLength;
         }
 
         private int ResolveDynamicTableIndex(int staticTableIndex, string name)
