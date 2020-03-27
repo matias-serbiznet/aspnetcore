@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -9,6 +10,7 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.E2ETesting;
+using Microsoft.AspNetCore.Internal;
 using Newtonsoft.Json.Linq;
 using OpenQA.Selenium;
 using Templates.Test.Helpers;
@@ -63,18 +65,20 @@ namespace Templates.Test.SpaTemplateTest
             using var npmRestoreResult = await Project.RestoreWithRetryAsync(Output, clientAppSubdirPath);
             Assert.True(0 == npmRestoreResult.ExitCode, ErrorMessages.GetFailedProcessMessage("npm restore", Project, npmRestoreResult));
 
-            using var lintResult = await ProcessEx.RunViaShellAsync(Output, clientAppSubdirPath, "npm run lint");
+            using var lintResult = ProcessEx.RunViaShell(Output, clientAppSubdirPath, "npm run lint");
             Assert.True(0 == lintResult.ExitCode, ErrorMessages.GetFailedProcessMessage("npm run lint", Project, lintResult));
 
+            // The default behavior of angular tests is watch mode, which leaves the test process open after it finishes, which leads to delays/hangs.
             var testcommand = "npm run test" + template == "angular" ? "-- --watch=false" : "";
-            var testResult = await ProcessEx.RunViaShellAsync(Output, clientAppSubdirPath, testcommand);
+
+            using var testResult = ProcessEx.RunViaShell(Output, clientAppSubdirPath, testcommand);
             Assert.True(0 == testResult.ExitCode, ErrorMessages.GetFailedProcessMessage("npm run test", Project, testResult));
 
             using var publishResult = await Project.RunDotNetPublishAsync();
             Assert.True(0 == publishResult.ExitCode, ErrorMessages.GetFailedProcessMessage("publish", Project, publishResult));
 
             // Run dotnet build after publish. The reason is that one uses Config = Debug and the other uses Config = Release
-            // The output from publish will go into bin/Release/netcoreapp5.0/publish and won't be affected by calling build
+            // The output from publish will go into bin/Release/netcoreappX.Y/publish and won't be affected by calling build
             // later, while the opposite is not true.
 
             using var buildResult = await Project.RunDotNetBuildAsync();
@@ -157,7 +161,7 @@ namespace Templates.Test.SpaTemplateTest
             {
                 try
                 {
-                    testResult = await ProcessEx.RunViaShellAsync(Output, clientAppSubdirPath, "npx rimraf ./build");
+                    testResult = ProcessEx.RunViaShell(Output, clientAppSubdirPath, "npx rimraf ./build");
                     testResultExitCode = testResult.ExitCode;
                     if (testResultExitCode == 0)
                     {
@@ -191,8 +195,11 @@ namespace Templates.Test.SpaTemplateTest
 
         private static async Task WarmUpServer(AspNetProcess aspNetProcess)
         {
+            var intervalInSeconds = 5;
             var attempt = 0;
-            var maxAttempts = 3;
+            var maxAttempts = 5;
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
             do
             {
                 try
@@ -201,7 +208,7 @@ namespace Templates.Test.SpaTemplateTest
                     var response = await aspNetProcess.SendRequest("/");
                     if (response.StatusCode == HttpStatusCode.OK)
                     {
-                        break;
+                        return;
                     }
                 }
                 catch (OperationCanceledException)
@@ -210,8 +217,11 @@ namespace Templates.Test.SpaTemplateTest
                 catch (HttpRequestException ex) when (ex.Message.StartsWith("The SSL connection could not be established"))
                 {
                 }
-                await Task.Delay(TimeSpan.FromSeconds(5 * attempt));
+                var currentDelay = intervalInSeconds * attempt;
+                await Task.Delay(TimeSpan.FromSeconds(currentDelay));
             } while (attempt < maxAttempts);
+            stopwatch.Stop();
+            throw new TimeoutException($"Could not contact the server within {stopwatch.Elapsed.TotalSeconds} seconds");
         }
 
         private void UpdatePublishedSettings()
@@ -244,25 +254,25 @@ namespace Templates.Test.SpaTemplateTest
             browser.Equal("Hello, world!", () => browser.FindElement(By.TagName("h1")).Text);
 
             // Can navigate to the counter page
-            browser.FindElement(By.PartialLinkText("Counter")).Click();
+            browser.Click(By.PartialLinkText("Counter"));
             browser.Contains("counter", () => browser.Url);
 
             browser.Equal("Counter", () => browser.FindElement(By.TagName("h1")).Text);
 
             // Clicking the counter button works
             browser.Equal("0", () => browser.FindElement(By.CssSelector("p>strong")).Text);
-            browser.FindElement(By.CssSelector("p+button")).Click();
+            browser.Click(By.CssSelector("p+button")) ;
             browser.Equal("1", () => browser.FindElement(By.CssSelector("p>strong")).Text);
 
             if (visitFetchData)
             {
-                browser.FindElement(By.PartialLinkText("Fetch data")).Click();
+                browser.Click(By.PartialLinkText("Fetch data"));
 
                 if (usesAuth)
                 {
                     // We will be redirected to the identity UI
                     browser.Contains("/Identity/Account/Login", () => browser.Url);
-                    browser.FindElement(By.PartialLinkText("Register as a new user")).Click();
+                    browser.Click(By.PartialLinkText("Register as a new user"));
 
                     var userName = $"{Guid.NewGuid()}@example.com";
                     var password = $"!Test.Password1$";
@@ -270,24 +280,24 @@ namespace Templates.Test.SpaTemplateTest
                     browser.FindElement(By.Name("Input.Email")).SendKeys(userName);
                     browser.FindElement(By.Name("Input.Password")).SendKeys(password);
                     browser.FindElement(By.Name("Input.ConfirmPassword")).SendKeys(password);
-                    browser.FindElement(By.Id("registerSubmit")).Click();
+                    browser.Click(By.Id("registerSubmit"));
 
                     // We will be redirected to the RegisterConfirmation
                     browser.Contains("/Identity/Account/RegisterConfirmation", () => browser.Url);
-                    browser.FindElement(By.PartialLinkText("Click here to confirm your account")).Click();
+                    browser.Click(By.PartialLinkText("Click here to confirm your account"));
 
                     // We will be redirected to the ConfirmEmail
                     browser.Contains("/Identity/Account/ConfirmEmail", () => browser.Url);
 
                     // Now we can login
-                    browser.FindElement(By.PartialLinkText("Login")).Click();
+                    browser.Click(By.PartialLinkText("Login"));
                     browser.Exists(By.Name("Input.Email"));
                     browser.FindElement(By.Name("Input.Email")).SendKeys(userName);
                     browser.FindElement(By.Name("Input.Password")).SendKeys(password);
-                    browser.FindElement(By.Id("login-submit")).Click();
+                    browser.Click(By.Id("login-submit"));
 
                     // Need to navigate to fetch page
-                    browser.FindElement(By.PartialLinkText("Fetch data")).Click();
+                    browser.Click(By.PartialLinkText("Fetch data"));
                 }
 
                 // Can navigate to the 'fetch data' page
@@ -304,10 +314,12 @@ namespace Templates.Test.SpaTemplateTest
                 var entries = logs.GetLog(logKind);
                 var badEntries = entries.Where(e => new LogLevel[] { LogLevel.Warning, LogLevel.Severe }.Contains(e.Level));
 
+                // Based on https://github.com/webpack/webpack-dev-server/issues/2134
                 badEntries = badEntries.Where(e =>
                     !e.Message.Contains("failed: WebSocket is closed before the connection is established.")
                     && !e.Message.Contains("[WDS] Disconnected!")
-                    && !e.Message.Contains("Timed out connecting to Chrome, retrying"));
+                    && !e.Message.Contains("Timed out connecting to Chrome, retrying")
+                    && !(e.Message.Contains("jsonp?c=") && e.Message.Contains("Uncaught TypeError:") && e.Message.Contains("is not a function")));
 
                 Assert.True(badEntries.Count() == 0, "There were Warnings or Errors from the browser." + Environment.NewLine + string.Join(Environment.NewLine, badEntries));
             }

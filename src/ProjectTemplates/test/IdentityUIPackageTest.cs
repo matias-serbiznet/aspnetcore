@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Testing;
 using Templates.Test.Helpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -117,8 +118,10 @@ namespace Templates.Test
             "Identity/lib/jquery-validation-unobtrusive/LICENSE.txt",
         };
 
-        [Theory]
+        [ConditionalTheory(Skip = "This test run for over an hour")]
         [MemberData(nameof(MSBuildIdentityUIPackageOptions))]
+        [SkipOnHelix("cert failure", Queues = "OSX.1014.Amd64;OSX.1014.Amd64.Open")]
+        [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/19716")]
         public async Task IdentityUIPackage_WorksWithDifferentOptions(IDictionary<string, string> packageOptions, string versionValidator, string[] expectedFiles)
         {
             Project = await ProjectFactory.GetOrCreateProject("identityuipackage" + string.Concat(packageOptions.Values), Output);
@@ -134,7 +137,7 @@ namespace Templates.Test
             Assert.True(0 == publishResult.ExitCode, ErrorMessages.GetFailedProcessMessage("publish", Project, publishResult));
 
             // Run dotnet build after publish. The reason is that one uses Config = Debug and the other uses Config = Release
-            // The output from publish will go into bin/Release/netcoreapp5.0/publish and won't be affected by calling build
+            // The output from publish will go into bin/Release/netcoreappX.Y/publish and won't be affected by calling build
             // later, while the opposite is not true.
 
             var buildResult = await Project.RunDotNetBuildAsync(packageOptions: packageOptions);

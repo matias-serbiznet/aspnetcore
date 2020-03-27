@@ -73,7 +73,7 @@ namespace Microsoft.AspNetCore.Components
         [Fact]
         public void IncomingParameterMatchesOverridenParameter_ThatDoesNotHasAttribute()
         {
-            // Test for https://github.com/aspnet/AspNetCore/issues/13162
+            // Test for https://github.com/dotnet/aspnetcore/issues/13162
             // Arrange
             var parameters = new ParameterViewBuilder
             {
@@ -673,7 +673,7 @@ namespace Microsoft.AspNetCore.Components
                 }
                 builder.CloseComponent();
 
-                var view = new ParameterView(builder.GetFrames().Array, ownerIndex: 0);
+                var view = new ParameterView(ParameterViewLifetime.Unbound, builder.GetFrames().Array, ownerIndex: 0);
 
                 var cascadingParameters = new List<CascadingParameterState>();
                 foreach (var kvp in _keyValuePairs)

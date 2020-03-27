@@ -77,6 +77,12 @@ MSBuild verbosity: q[uiet], m[inimal], n[ormal], d[etailed], and diag[nostic]
 .PARAMETER MSBuildArguments
 Additional MSBuild arguments to be passed through.
 
+.PARAMETER DotNetRuntimeSourceFeed
+Additional feed that can be used when downloading .NET runtimes
+
+.PARAMETER DotNetRuntimeSourceFeedKey
+Key for feed that can be used when downloading .NET runtimes
+
 .EXAMPLE
 Building both native and managed projects.
 
@@ -93,7 +99,7 @@ Running tests.
     build.ps1 -test
 
 .LINK
-Online version: https://github.com/aspnet/AspNetCore/blob/master/docs/BuildFromSource.md
+Online version: https://github.com/dotnet/aspnetcore/blob/master/docs/BuildFromSource.md
 #>
 [CmdletBinding(PositionalBinding = $false, DefaultParameterSetName='Groups')]
 param(
@@ -112,7 +118,7 @@ param(
     [ValidateSet('Debug', 'Release')]
     $Configuration,
 
-    [ValidateSet('x64', 'x86', 'arm')]
+    [ValidateSet('x64', 'x86', 'arm', 'arm64')]
     $Architecture = 'x64',
 
     # A list of projects which should be built.
@@ -151,6 +157,11 @@ param(
 
     # Other lifecycle targets
     [switch]$Help, # Show help
+
+    # Optional arguments that enable downloading an internal
+    # runtime or runtime from a non-default location
+    [string]$DotNetRuntimeSourceFeed,
+    [string]$DotNetRuntimeSourceFeedKey,
 
     # Capture the rest
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -251,6 +262,16 @@ if (-not $Configuration) {
 }
 $MSBuildArguments += "/p:Configuration=$Configuration"
 
+[string[]]$ToolsetBuildArguments = @()
+if ($DotNetRuntimeSourceFeed -or $DotNetRuntimeSourceFeedKey) {
+    $runtimeFeedArg = "/p:DotNetRuntimeSourceFeed=$DotNetRuntimeSourceFeed"
+    $runtimeFeedKeyArg = "/p:DotNetRuntimeSourceFeedKey=$DotNetRuntimeSourceFeedKey"
+    $MSBuildArguments += $runtimeFeedArg
+    $MSBuildArguments += $runtimeFeedKeyArg
+    $ToolsetBuildArguments += $runtimeFeedArg
+    $ToolsetBuildArguments += $runtimeFeedKeyArg
+}
+
 $foundJdk = $false
 $javac = Get-Command javac -ErrorAction Ignore -CommandType Application
 $localJdkPath = "$PSScriptRoot\.tools\jdk\win-x64\"
@@ -307,13 +328,15 @@ if (-not $foundJdk -and $RunBuild -and ($All -or $BuildJava) -and -not $NoBuildJ
 # Initialize global variables need to be set before the import of Arcade is imported
 $restore = $RunRestore
 
+# Though VS Code may indicate $nodeReuse, $warnAsError and $msbuildEngine are unused, tools.ps1 uses them.
+
 # Disable node reuse - Workaround perpetual issues in node reuse and custom task assemblies
 $nodeReuse = $false
 $env:MSBUILDDISABLENODEREUSE=1
 
 # Our build often has warnings that we can't fix, like "MSB3026: Could not copy" due to race
 # conditions in building C++
-# Fixing this is tracked by https://github.com/aspnet/AspNetCore-Internal/issues/601
+# Fixing this is tracked by https://github.com/dotnet/aspnetcore-internal/issues/601
 $warnAsError = $false
 
 if ($ForceCoreMsbuild) {
@@ -328,10 +351,10 @@ if ($CI) {
 }
 
 # tools.ps1 corrupts global state, so reset these values in case they carried over from a previous build
-rm variable:global:_BuildTool -ea Ignore
-rm variable:global:_DotNetInstallDir -ea Ignore
-rm variable:global:_ToolsetBuildProj -ea Ignore
-rm variable:global:_MSBuildExe -ea Ignore
+Remove-Item variable:global:_BuildTool -ea Ignore
+Remove-Item variable:global:_DotNetInstallDir -ea Ignore
+Remove-Item variable:global:_ToolsetBuildProj -ea Ignore
+Remove-Item variable:global:_MSBuildExe -ea Ignore
 
 # Import Arcade
 . "$PSScriptRoot/eng/common/tools.ps1"
@@ -373,7 +396,8 @@ try {
             /p:Configuration=Release `
             /p:Restore=$RunRestore `
             /p:Build=true `
-            /clp:NoSummary
+            /clp:NoSummary `
+            @ToolsetBuildArguments
     }
 
     MSBuild $toolsetBuildProj `
@@ -391,10 +415,10 @@ finally {
     }
 
     # tools.ps1 corrupts global state, so reset these values so they don't carry between invocations of build.ps1
-    rm variable:global:_BuildTool -ea Ignore
-    rm variable:global:_DotNetInstallDir -ea Ignore
-    rm variable:global:_ToolsetBuildProj -ea Ignore
-    rm variable:global:_MSBuildExe -ea Ignore
+    Remove-Item variable:global:_BuildTool -ea Ignore
+    Remove-Item variable:global:_DotNetInstallDir -ea Ignore
+    Remove-Item variable:global:_ToolsetBuildProj -ea Ignore
+    Remove-Item variable:global:_MSBuildExe -ea Ignore
 
     if ($DumpProcesses -or $ci) {
         Stop-Job -Name DumpProcesses

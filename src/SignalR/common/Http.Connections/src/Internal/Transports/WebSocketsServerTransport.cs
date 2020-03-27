@@ -155,7 +155,8 @@ namespace Microsoft.AspNetCore.Http.Connections.Internal.Transports
                     var memory = _application.Output.GetMemory();
 
                     var receiveResult = await socket.ReceiveAsync(memory, token);
-                    // Need to check again for netcoreapp5.0 because a close can happen between a 0-byte read and the actual read
+
+                    // Need to check again for netcoreapp3.0 and later because a close can happen between a 0-byte read and the actual read
                     if (receiveResult.MessageType == WebSocketMessageType.Close)
                     {
                         return;
@@ -230,7 +231,8 @@ namespace Microsoft.AspNetCore.Http.Connections.Internal.Transports
 
                                 if (WebSocketCanSend(socket))
                                 {
-                                    await socket.SendAsync(buffer, webSocketMessageType);
+                                    _connection.StartSendCancellation();
+                                    await socket.SendAsync(buffer, webSocketMessageType, _connection.SendingToken);
                                 }
                                 else
                                 {
@@ -253,6 +255,7 @@ namespace Microsoft.AspNetCore.Http.Connections.Internal.Transports
                     }
                     finally
                     {
+                        _connection.StopSendCancellation();
                         _application.Input.AdvanceTo(buffer.End);
                     }
                 }
