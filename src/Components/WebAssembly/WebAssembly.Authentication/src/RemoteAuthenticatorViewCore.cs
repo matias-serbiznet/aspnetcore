@@ -225,13 +225,14 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Authentication
             {
                 State = AuthenticationState
             });
+
             switch (result.Status)
             {
                 case RemoteAuthenticationStatus.Redirect:
                     break;
                 case RemoteAuthenticationStatus.Success:
                     await OnLogInSucceeded.InvokeAsync(result.State);
-                    await NavigateToReturnUrl(returnUrl);
+                    await NavigateToReturnUrl(GetReturnUrl(result.State, returnUrl));
                     break;
                 case RemoteAuthenticationStatus.Failure:
                     var uri = Navigation.ToAbsoluteUri($"{ApplicationPaths.LogInFailedPath}?message={Uri.EscapeDataString(result.ErrorMessage)}").ToString();

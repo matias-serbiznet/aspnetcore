@@ -20,9 +20,9 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Authentication
         AuthenticationStateProvider,
         IRemoteAuthenticationService<TRemoteAuthenticationState>,
         IAccessTokenProvider
-         where TRemoteAuthenticationState : RemoteAuthenticationState
-         where TProviderOptions : new()
-         where TAccount : RemoteUserAccount
+        where TRemoteAuthenticationState : RemoteAuthenticationState
+        where TProviderOptions : new()
+        where TAccount : RemoteUserAccount
     {
         private static readonly TimeSpan _userCacheRefreshInterval = TimeSpan.FromSeconds(60);
 
@@ -82,8 +82,8 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Authentication
             if (result.Status == RemoteAuthenticationStatus.Success)
             {
                 var getUserTask = GetUser();
-                UpdateUser(getUserTask);
                 await getUserTask;
+                UpdateUser(getUserTask);
             }
 
             return result;
@@ -99,8 +99,8 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Authentication
             if (result.Status == RemoteAuthenticationStatus.Success)
             {
                 var getUserTask = GetUser();
-                UpdateUser(getUserTask);
                 await getUserTask;
+                UpdateUser(getUserTask);
             }
 
             return result;
@@ -116,8 +116,8 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Authentication
             if (result.Status == RemoteAuthenticationStatus.Success)
             {
                 var getUserTask = GetUser();
-                UpdateUser(getUserTask);
                 await getUserTask;
+                UpdateUser(getUserTask);
             }
 
             return result;
@@ -133,8 +133,8 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Authentication
             if (result.Status == RemoteAuthenticationStatus.Success)
             {
                 var getUserTask = GetUser();
-                UpdateUser(getUserTask);
                 await getUserTask;
+                UpdateUser(getUserTask);
             }
 
             return result;

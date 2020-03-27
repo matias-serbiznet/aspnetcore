@@ -127,9 +127,7 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
 
             ClickAndNavigate(By.PartialLinkText("Settings"), "/admin-settings");
 
-            var admin = Browser.Exists(By.Id("admin-action"));
-
-            Browser.Execute(By.Id("admin-success"), button => button.Click());
+            Browser.Exists(By.Id("admin-action")).Click();
 
             Browser.Exists(By.Id("admin-success"));
         }
@@ -149,6 +147,7 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
             var userName = $"{Guid.NewGuid()}@example.com";
             var password = $"!Test.Password1$";
             RegisterCore(userName, password);
+            CompleteProfileDetails();
 
             // Need to navigate to fetch page
             Browser.FindElement(By.PartialLinkText("Fetch data")).Click();
@@ -220,6 +219,7 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
             var userName = $"{Guid.NewGuid()}@example.com";
             var password = $"!Test.Password1$";
             RegisterCore(userName, password);
+            CompleteProfileDetails();
 
             ClickAndNavigate(By.PartialLinkText($"Hello, {userName}!"), "/Identity/Account/Manage");
 
