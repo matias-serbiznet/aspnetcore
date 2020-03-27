@@ -1911,13 +1911,11 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         {
             _serviceContext.ServerOptions.DisableResponseDynamicHeaderCompression = true;
 
-            await InitializeConnectionAsync(_noopApplication, expectedSettingsCount: 4);
+            await InitializeConnectionAsync(_noopApplication);
 
             await StartStreamAsync(1, _browserRequestHeaders, endStream: true);
 
-            _hpackEncoder.UpdateMaxHeaderTableSize(0);
-
-            var headerFrame = await ExpectAsync(Http2FrameType.HEADERS,
+            await ExpectAsync(Http2FrameType.HEADERS,
                 withLength: 37,
                 withFlags: (byte)(Http2HeadersFrameFlags.END_HEADERS | Http2HeadersFrameFlags.END_STREAM),
                 withStreamId: 1);
