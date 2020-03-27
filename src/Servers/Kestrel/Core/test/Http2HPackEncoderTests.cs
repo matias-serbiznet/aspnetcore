@@ -76,7 +76,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
             var enumerator = new Http2HeadersEnumerator();
 
-            var http2HPackEncoder = new Http2HPackEncoder(256);
+            var http2HPackEncoder = new Http2HPackEncoder(maxHeaderTableSize: 256);
 
             // First response
             enumerator.Initialize(headers);
@@ -158,7 +158,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             Assert.Equal(
                 "88-C1-61-1D-4D-6F-6E-2C-20-32-31-20-4F-63-74-20-" +
                 "32-30-31-33-20-32-30-3A-31-33-3A-32-32-20-47-4D-" +
-                "54-5A-04-67-7A-69-70-C1-2F-28-38-66-6F-6F-3D-41-" +
+                "54-5A-04-67-7A-69-70-C1-1F-28-38-66-6F-6F-3D-41-" +
                 "53-44-4A-4B-48-51-4B-42-5A-58-4F-51-57-45-4F-50-" +
                 "49-55-41-58-51-57-45-4F-49-55-3B-20-6D-61-78-2D-" +
                 "61-67-65-3D-33-36-30-30-3B-20-76-65-72-73-69-6F-" +
@@ -202,12 +202,12 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             var enumerator = new Http2HeadersEnumerator();
             enumerator.Initialize(headers);
 
-            var http2HPackEncoder = new Http2HPackEncoder(Http2PeerSettings.DefaultHeaderTableSize);
+            var http2HPackEncoder = new Http2HPackEncoder(maxHeaderTableSize: Http2PeerSettings.DefaultHeaderTableSize);
             Assert.True(http2HPackEncoder.BeginEncodeHeaders(enumerator, buffer, out _));
 
             if (neverIndex)
             {
-                Assert.Equal(0x20, buffer[0] & 0x20);
+                Assert.Equal(0x10, buffer[0] & 0x10);
             }
             else
             {

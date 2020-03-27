@@ -14,6 +14,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
         // Internal for testing
         internal readonly HPackHeaderEntry Head;
 
+        private readonly bool _disableDynamicCompression;
         private readonly HPackHeaderEntry[] _headerBuckets;
         private readonly byte _hashMask;
         private uint _headerTableSize;
@@ -21,8 +22,9 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
         private bool _pendingTableSizeUpdate;
         private HPackHeaderEntry _removed;
 
-        public Http2HPackEncoder(uint maxHeaderTableSize = Http2PeerSettings.DefaultHeaderTableSize)
+        public Http2HPackEncoder(bool disableDynamicCompression = false, uint maxHeaderTableSize = Http2PeerSettings.DefaultHeaderTableSize)
         {
+            _disableDynamicCompression = disableDynamicCompression;
             _maxHeaderTableSize = maxHeaderTableSize;
             Head = new HPackHeaderEntry();
             Head.Initialize(-1, string.Empty, string.Empty, int.MaxValue, null);
@@ -179,7 +181,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.HPack
             }
 
             // No dynamic table. Only use the static table.
-            if (_maxHeaderTableSize == 0 || IsNotDynamicallyIndexed(staticTableIndex))
+            if (_disableDynamicCompression || _maxHeaderTableSize == 0 || IsNotDynamicallyIndexed(staticTableIndex))
             {
                 return staticTableIndex == -1
                     ? HPackEncoder.EncodeLiteralHeaderFieldWithoutIndexingNewName(name, value, buffer, out bytesWritten)

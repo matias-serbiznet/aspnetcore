@@ -57,7 +57,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
             MinDataRate minResponseDataRate,
             string connectionId,
             MemoryPool<byte> memoryPool,
-            IKestrelTrace log)
+            ServiceContext serviceContext)
         {
             // Allow appending more data to the PipeWriter when a flush is pending.
             _outputWriter = new ConcurrentPipeWriter(outputPipeWriter, memoryPool, _writeLock);
@@ -65,13 +65,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
             _http2Connection = http2Connection;
             _connectionOutputFlowControl = connectionOutputFlowControl;
             _connectionId = connectionId;
-            _log = log;
+            _log = serviceContext.Log;
             _timeoutControl = timeoutControl;
             _minResponseDataRate = minResponseDataRate;
-            _flusher = new TimingPipeFlusher(_outputWriter, timeoutControl, log);
+            _flusher = new TimingPipeFlusher(_outputWriter, timeoutControl, serviceContext.Log);
             _outgoingFrame = new Http2Frame();
             _headerEncodingBuffer = new byte[_maxFrameSize];
-            _hpackEncoder = new Http2HPackEncoder();
+
+            _hpackEncoder = new Http2HPackEncoder(serviceContext.ServerOptions.DisableResponseDynamicHeaderCompression);
         }
 
         public void UpdateMaxHeaderTableSize(uint maxHeaderTableSize)

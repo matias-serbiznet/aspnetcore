@@ -1907,6 +1907,32 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         }
 
         [Fact]
+        public async Task HEADERS_DisableDynamicHeaderCompression_HeadersNotCompressed()
+        {
+            _serviceContext.ServerOptions.DisableResponseDynamicHeaderCompression = true;
+
+            await InitializeConnectionAsync(_noopApplication, expectedSettingsCount: 4);
+
+            await StartStreamAsync(1, _browserRequestHeaders, endStream: true);
+
+            _hpackEncoder.UpdateMaxHeaderTableSize(0);
+
+            var headerFrame = await ExpectAsync(Http2FrameType.HEADERS,
+                withLength: 37,
+                withFlags: (byte)(Http2HeadersFrameFlags.END_HEADERS | Http2HeadersFrameFlags.END_STREAM),
+                withStreamId: 1);
+
+            await StartStreamAsync(3, _browserRequestHeaders, endStream: true);
+
+            await ExpectAsync(Http2FrameType.HEADERS,
+                withLength: 37,
+                withFlags: (byte)(Http2HeadersFrameFlags.END_HEADERS | Http2HeadersFrameFlags.END_STREAM),
+                withStreamId: 3);
+
+            await StopConnectionAsync(expectedLastStreamId: 3, ignoreNonGoAwayFrames: false);
+        }
+
+        [Fact]
         public async Task HEADERS_OverMaxStreamLimit_Refused()
         {
             CreateConnection();

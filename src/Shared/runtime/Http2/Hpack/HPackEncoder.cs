@@ -112,11 +112,11 @@ namespace System.Net.Http.HPack
         /// <summary>Encodes a "Literal Header Field never Indexing".</summary>
         public static bool EncodeLiteralHeaderFieldNeverIndexing(int index, string value, Span<byte> destination, out int bytesWritten)
         {
-            // From https://tools.ietf.org/html/rfc7541#section-6.2.2
+            // From https://tools.ietf.org/html/rfc7541#section-6.2.3
             // ------------------------------------------------------
             //   0   1   2   3   4   5   6   7
             // +---+---+---+---+---+---+---+---+
-            // | 0 | 0 | 0 | 0 |  Index (4+)   |
+            // | 0 | 0 | 0 | 1 |  Index (4+)   |
             // +---+---+-----------------------+
             // | H |     Value Length (7+)     |
             // +---+---------------------------+
@@ -125,7 +125,7 @@ namespace System.Net.Http.HPack
 
             if ((uint)destination.Length >= 2)
             {
-                destination[0] = 0x20;
+                destination[0] = 0x10;
                 if (IntegerEncoder.Encode(index, 4, destination, out int indexLength))
                 {
                     Debug.Assert(indexLength >= 1);
@@ -253,7 +253,7 @@ namespace System.Net.Http.HPack
         /// <summary>Encodes a "Literal Header Field never Indexing - New Name".</summary>
         public static bool EncodeLiteralHeaderFieldNeverIndexingNewName(string name, string value, Span<byte> destination, out int bytesWritten)
         {
-            // From https://tools.ietf.org/html/rfc7541#section-6.2.2
+            // From https://tools.ietf.org/html/rfc7541#section-6.2.3
             // ------------------------------------------------------
             //   0   1   2   3   4   5   6   7
             // +---+---+---+---+---+---+---+---+

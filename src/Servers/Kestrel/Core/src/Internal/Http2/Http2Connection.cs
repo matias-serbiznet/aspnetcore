@@ -87,7 +87,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                 httpLimits.MinResponseDataRate,
                 context.ConnectionId,
                 context.MemoryPool,
-                context.ServiceContext.Log);
+                context.ServiceContext);
 
             var inputOptions = new PipeOptions(pool: context.MemoryPool,
                 readerScheduler: context.ServiceContext.Scheduler,
