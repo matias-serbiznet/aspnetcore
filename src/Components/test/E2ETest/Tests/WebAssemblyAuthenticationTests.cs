@@ -466,9 +466,16 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
 
         public void Dispose()
         {
-            // Make the tests run faster by navigating back to the home page when we are done
-            // If we don't, then the next test will reload the whole page before it starts
-            Browser.FindElement(By.LinkText("Home")).Click();
+            try
+            {
+                // Make the tests run faster by navigating back to the home page when we are done
+                // If we don't, then the next test will reload the whole page before it starts
+                Browser.FindElement(By.LinkText("Home")).Click();
+            }
+            catch
+            {
+                // We don't care if this step fails.
+            }
         }
 
         private class JwtPayload
