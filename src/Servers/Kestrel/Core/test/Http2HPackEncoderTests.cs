@@ -476,13 +476,5 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
             return headers;
         }
-
-        private class TestSensitivityDetector : IHeaderSensitivityDetector
-        {
-            public bool IsSensitive(string name, string value)
-            {
-                return true;
-            }
-        }
     }
 }
